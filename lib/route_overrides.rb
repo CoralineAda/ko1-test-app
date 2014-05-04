@@ -1,7 +1,7 @@
 module RouteOverrides
 
   def polymorphic_url(obj, options={})
-    obj.kind_of?(Array) ?  url_from_array(obj, options) : url_from_object(obj, options)
+    obj.kind_of?(Array) ? url_from_array(obj, options) : url_from_object(obj, options)
   end
 
   def url_from_object(obj, options)
@@ -9,9 +9,7 @@ module RouteOverrides
     inflection ||= :plural
     args = nil
     if options.present?
-      args = temp_args.select{|arg| ! ["String", "Symbol"].include?(arg.class.name) }
-      args = args.map{|arg| convert_to_model(arg)}
-      url_options = options.except(:action, :routing_type)
+      url_options = options.inject({}){|h,pair| h[pair[0]] = pair[1] unless [:action, :routing_type].include?(pair[0]); h}
       args.last.kind_of?(Hash) ? args.last.merge!(url_options) : args << url_options
     end
     self.send(build_named_route_call(obj, inflection, options), *args)
@@ -21,20 +19,20 @@ module RouteOverrides
     recipient = array.shift if array.first.kind_of?(ActionDispatch::Routing::RoutesProxy)
     record = convert_to_model(extract_record(array))
 
-    inflection, temp_args = if record.try(:persisted?)
-      [:singular, array]
-    elsif
-      [:singular, array.pop && array]
+    if record.try(:persisted?)
+      inflection = :singular
+    elsif options[:action_name] == 'new'
+      inflection = array.pop && :singular
     else
-      [:plural, array.pop && array]
+      inflection = array.pop && :plural
     end
-    args = temp_args.select{|arg| ! ["String", "Symbol"].include?(arg.class.name) }.map{|arg| convert_to_model(arg)}
-    if options.present?
-      url_options = options.except(:action, :routing_type)
+
+    args = array.select{|arg| ! [String, Symbol].include?(arg.class)}.map{|arg| convert_to_model(arg)}
+    if args.present? && options.present?
+      url_options = options.inject({}){|h,pair| h[pair[0]] = pair[1] unless [:action, :routing_type].include?(pair[0]); h}
       args.last.kind_of?(Hash) ? args.last.merge!(url_options) : args << url_options
     end
-    named_route = build_named_route_call(array, inflection, options)
-    (recipient || self).send(named_route, *args)
+    (recipient || self).send(build_named_route_call(array, inflection, options), *args)
   end
 
 end
