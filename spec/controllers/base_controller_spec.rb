@@ -34,6 +34,11 @@ describe "UsersController" do
     expect(revised_controller.url_for(arg.dup)).to eq(original_controller.url_for(arg.dup))
   end
 
+  it "generates a URL for a new nested member with a specified RESTful action" do
+    arg = [:create, group, Member.new]
+    expect(revised_controller.url_for(arg.dup)).to eq(original_controller.url_for(arg.dup))
+  end
+
   it "generates a URL for a nested member with a specified RESTful action" do
     arg = [:edit, group, member]
     expect(revised_controller.url_for(arg.dup)).to eq(original_controller.url_for(arg.dup))
