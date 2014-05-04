@@ -1,42 +1,45 @@
 module RouteOverrides
 
-  def extract_params_from(args)
-    return self, args unless args.kind_of? Array
-    args.compact!
-    raise ArgumentError, "Nil location provided. Can't build URI." if args.include? nil
-    return [
-      (args.first.kind_of?(ActionDispatch::Routing::RoutesProxy) && args.shift || self),
-      args
-    ]
-  end
-
-  def inflection_with_args(action_name, record, args)
+  def inflection_with_args(record, args, action_name)
     return :plural, args.pop && args unless record.try(:persisted?)
     return :singular, args.pop && args if action_name.to_s == "new"
-    return :singular, args unless action_name
-    return :singular, args
-  end
-
-  def convert_and_extract(subject)
-    convert_to_model(extract_record(subject))
+    [:singular, args]
   end
 
   def sanitize_args(args)
     args.delete_if {|arg| arg.kind_of?(Symbol) || arg.kind_of?(String)}
   end
 
-  def polymorphic_url(subject, options={})
-    recipient, subject = extract_params_from(subject)
-    record = convert_and_extract(subject)
-    args = [subject.dup].flatten
-    inflection, args = inflection_with_args(options.fetch(:action, nil),record,args)
-    args = sanitize_args(args).collect! { |a| convert_to_model(a) }
-    url_options = options.except(:action, :routing_type)
-    unless url_options.empty?
+  def polymorphic_url(obj, options={})
+    obj.kind_of?(Array) ?  url_from_array(obj, options) : url_from_object(obj, options)
+  end
+
+  def url_from_object(obj, options)
+    inflection = :singular if options[:action] == 'new' || obj.persisted?
+    inflection ||= :plural
+    args = nil
+    if options.present?
+      args = sanitize_args(options).collect! { |a| convert_to_model(a) }
+      url_options = options.except(:action, :routing_type)
       args.last.kind_of?(Hash) ? args.last.merge!(url_options) : args << url_options
     end
-    named_route = build_named_route_call(subject, inflection, options)
-    recipient.send(named_route, *args)
+    self.send(build_named_route_call(obj, inflection, options), *args)
+  end
+
+  def url_from_array(array, options={})
+    recipient = array.shift if array.first.kind_of?(ActionDispatch::Routing::RoutesProxy)
+    record = convert_to_model(extract_record(array))
+    inflection, temp_args = inflection_with_args(record, array, options.fetch(:action, nil))
+    args = temp_args.inject([]) do |a, arg|
+      a << convert_to_model(arg) unless [Symbol, String].include?(arg.class)
+      a
+    end
+    if options.present?
+      url_options = options.except(:action, :routing_type)
+      args.last.kind_of?(Hash) ? args.last.merge!(url_options) : args << url_options
+    end
+    named_route = build_named_route_call(array, inflection, options)
+    (recipient || self).send(named_route, *args)
   end
 
 end

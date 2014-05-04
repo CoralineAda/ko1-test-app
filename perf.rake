@@ -49,7 +49,7 @@ end
 TESTENV = rackenv TEST_PATH
 
 def do_url_for_test controller, args
-  controller.url_for(args)
+  controller.url_for(args.dup)
 end
 
 task :url_for do
@@ -57,7 +57,7 @@ task :url_for do
   app.app
 
   group = Group.create
-  member = Member.create(group_id: group)
+  member = Member.create(group_id: group.id)
   control = HomeController.new
   experiment = MembersController.new
 
@@ -71,18 +71,18 @@ task :url_for do
     :nested_with_verb => [:edit, group, member]
   }
 
-  Benchmark.ips(10) do |x|
-    args.each do |key, arg_set|
-      x.report("#{TEST_CNT} requests for control#url_for(#{key})") do
-        do_url_for_test(control, arg_set.dup)
-      end
-    end
-  end
+  # Benchmark.ips(10) do |x|
+  #   args.each do |key, arg_set|
+  #     x.report("control#url_for(#{key})") do
+  #       do_url_for_test(control, arg_set)
+  #     end
+  #   end
+  # end
 
   Benchmark.ips(10) do |x|
     args.each do |key, arg_set|
-      x.report("#{TEST_CNT} requests for experiment#url_for(#{key})") do
-        do_url_for_test(experiment, arg_set.dup)
+      x.report("experiment#url_for #{key} ") do
+        do_url_for_test(experiment, arg_set)
       end
     end
   end
